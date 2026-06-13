@@ -1,0 +1,262 @@
+// schema.prisma — EduTenant Korea full schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Tenant ──────────────────────────────────────────────
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      Plan     @default(FREE)
+  createdAt DateTime @default(now())
+
+  users       User[]
+  classes     Class[]
+  enrollments Enrollment[]
+  schedules   Schedule[]
+  attendance  Attendance[]
+  homework    Homework[]
+  submissions HomeworkSubmission[]
+  payments    Payment[]
+  notices     Notice[]
+}
+
+// ─── User / Auth ─────────────────────────────────────────
+
+model User {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  email      String
+  name       String
+  role       Role
+  oauthProvider OAuthProvider?
+  oauthId    String?
+  createdAt  DateTime @default(now())
+
+  taughtClasses Class[]           @relation("Instructor")
+  enrollments   Enrollment[]
+  attendance    Attendance[]
+  homeworkSubmissions HomeworkSubmission[]
+  payments      Payment[]         @relation("Payer")
+  childOf       ParentStudent[]   @relation("Parent")
+  parentOf      ParentStudent[]   @relation("Student")
+  notices       Notice[]
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, oauthProvider, oauthId])
+  @@index([tenantId])
+  @@index([tenantId, role])
+}
+
+// Links PARENT users to their STUDENT children (within same tenant)
+model ParentStudent {
+  id        String @id @default(cuid())
+  tenantId  String
+  parentId  String
+  studentId String
+  parent    User   @relation("Parent",  fields: [parentId],  references: [id])
+  student   User   @relation("Student", fields: [studentId], references: [id])
+
+  @@unique([tenantId, parentId, studentId])
+  @@index([tenantId])
+}
+
+// ─── Class & Enrollment ──────────────────────────────────
+
+model Class {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String                     // e.g. "중등 수학 A반"
+  subject      String                     // e.g. "수학", "영어"
+  instructorId String
+  instructor   User     @relation("Instructor", fields: [instructorId], references: [id])
+  maxStudents  Int      @default(20)
+  createdAt    DateTime @default(now())
+
+  enrollments  Enrollment[]
+  schedules    Schedule[]
+  homework     Homework[]
+
+  @@index([tenantId])
+  @@index([tenantId, instructorId])
+}
+
+model Enrollment {
+  id        String           @id @default(cuid())
+  tenantId  String
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  userId    String
+  classId   String
+  status    EnrollmentStatus @default(ACTIVE)
+  enrolledAt DateTime        @default(now())
+
+  user      User   @relation(fields: [userId],  references: [id])
+  class     Class  @relation(fields: [classId], references: [id])
+
+  @@unique([tenantId, userId, classId])
+  @@index([tenantId])
+}
+
+// ─── Schedule & Attendance ───────────────────────────────
+
+model Schedule {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id])
+  dayOfWeek Int                           // 0=Sun … 6=Sat
+  startTime String                        // "14:00"
+  endTime   String                        // "16:00"
+  room      String?
+
+  attendance Attendance[]
+
+  @@index([tenantId])
+  @@index([tenantId, classId])
+}
+
+model Attendance {
+  id         String           @id @default(cuid())
+  tenantId   String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  scheduleId String
+  schedule   Schedule         @relation(fields: [scheduleId], references: [id])
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  date       DateTime         @db.Date
+  status     AttendanceStatus @default(PRESENT)
+  note       String?
+
+  @@unique([tenantId, scheduleId, userId, date])
+  @@index([tenantId])
+  @@index([tenantId, userId])
+}
+
+// ─── Homework ────────────────────────────────────────────
+
+model Homework {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id])
+  title       String
+  description String?
+  dueDate     DateTime
+  createdAt   DateTime @default(now())
+
+  submissions HomeworkSubmission[]
+
+  @@index([tenantId])
+  @@index([tenantId, classId])
+}
+
+model HomeworkSubmission {
+  id         String           @id @default(cuid())
+  tenantId   String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  homeworkId String
+  homework   Homework         @relation(fields: [homeworkId], references: [id])
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  fileUrl    String?
+  comment    String?
+  status     SubmissionStatus @default(SUBMITTED)
+  grade      Int?             // 0–100
+  submittedAt DateTime        @default(now())
+
+  @@unique([tenantId, homeworkId, userId])
+  @@index([tenantId])
+}
+
+// ─── Payments (월납 tuition) ─────────────────────────────
+
+model Payment {
+  id        String        @id @default(cuid())
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  payerId   String
+  payer     User          @relation("Payer", fields: [payerId], references: [id])
+  amount    Int                            // KRW (원)
+  month     String                         // "2024-09"
+  status    PaymentStatus @default(PENDING)
+  paidAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, payerId])
+  @@index([tenantId, month])
+}
+
+// ─── Notice board ────────────────────────────────────────
+
+model Notice {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  title     String
+  body      String
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  INSTRUCTOR
+  PARENT
+  STUDENT
+}
+
+enum OAuthProvider {
+  KAKAO
+  NAVER
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  WITHDRAWN
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+  RETURNED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  REFUNDED
+}

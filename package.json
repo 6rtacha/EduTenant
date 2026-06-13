@@ -1,0 +1,26 @@
+{
+  "name": "edutenant",
+  "version": "1.0.0",
+  "description": "SaaS project",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev:backend": "npm --workspace backend run start:dev",
+    "build:frontend": "npm --workspace frontend run build",
+    "build:backend": "npm --workspace backend run build",
+    "lint:frontend": "npm --workspace frontend run lint",
+    "lint:backend": "npm --workspace backend run lint",
+    "db:test:up": "docker compose up -d postgres-test",
+    "db:test:down": "docker compose down",
+    "db:test:migrate": "npm --workspace backend run db:test:migrate",
+    "test": "npm run test:backend",
+    "test:backend": "npm run db:test:migrate && npm --workspace backend test",
+    "test:backend:e2e": "npm run db:test:migrate && npm --workspace backend run test:e2e"
+  },
+  "workspaces": [
+    "apps/*"
+  ]
+}
