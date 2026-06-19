@@ -155,18 +155,24 @@ describe('Tenant Isolation', () => {
 
   describe('Enrollment isolation', () => {
     beforeAll(async () => {
+      await cleanupTestTenant('hagwon-a');
+      await cleanupTestTenant('hagwon-b');
+
       await seedTestTenant('hagwon-a');
       await seedTestTenant('hagwon-b');
 
-      const a = await prisma.tenant.findUnique({ where: { slug: 'hagwon-a' } });
+      const a = await prisma.tenant.findUnique({
+        where: { slug: 'hagwon-a' },
+      });
+
       const studentA = await prisma.user.findFirst({
         where: { tenantId: a!.id, role: 'STUDENT' },
       });
+
       const classA = await prisma.class.findFirst({
         where: { tenantId: a!.id },
       });
 
-      // Enroll student A into class A
       await prisma.enrollment.create({
         data: {
           tenantId: a!.id,

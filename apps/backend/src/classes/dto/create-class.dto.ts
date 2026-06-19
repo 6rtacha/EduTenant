@@ -14,15 +14,15 @@ import { ClassScheduleDto } from './class-schedule.dto';
 export class CreateClassDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsNotEmpty()
-  subject: string;
+  subject!: string;
 
   @IsString()
   @IsNotEmpty()
-  instructorId: string;
+  instructorId!: string;
 
   @IsOptional()
   @IsInt()

@@ -11,6 +11,9 @@ import { AuthGuard } from './common/guards/auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { ClassesModule } from './classes/classes.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
+import { SchedulesModule } from './schedules/schedules.module';
+import { AttendanceModule } from './attendance/attendance.module';
+// import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import { EnrollmentsModule } from './enrollments/enrollments.module';
     AuthModule,
     ClassesModule,
     EnrollmentsModule,
+    SchedulesModule,
+    AttendanceModule,
+    // UsersModule,
   ],
   controllers: [AppController],
   providers: [
